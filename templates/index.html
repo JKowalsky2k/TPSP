@@ -12,7 +12,7 @@
 <h1 class="mb-4" id="page-title" contenteditable="true" spellcheck="false" data-default="{{ default_page_title }}">{{ page_title }}</h1>
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-    <a href="/live" target="_blank" class="btn btn-primary">Podgląd tabeli (Live)</a>
+    <a href="/live" target="_blank" class="btn btn-primary">Tabela wyników (Na żywo)</a>
     <a href="{{ url_for('export_pdf', sort=sort, order=order) }}" class="btn btn-success">Export tabeli</a>
     <a href="/metrics-pdf" class="btn btn-secondary">Generacja metryk</a>
     <div class="btn-group" role="group" aria-label="Sortowanie kategorii">
@@ -20,6 +20,32 @@
            class="btn btn-outline-dark {% if sort == 'category_result' and order != 'desc' %}active{% endif %}">
             Kategorie A→Z, wynik malejąco
         </a>
+    </div>
+    <div class="form-check form-switch ms-auto">
+        <input class="form-check-input" type="checkbox" id="dev-menu-toggle">
+        <label class="form-check-label" for="dev-menu-toggle">Tryb deweloperski</label>
+    </div>
+    <button type="button" class="btn btn-outline-secondary ms-2" id="create-backup-button">
+        Utwórz kopię zapasową
+    </button>
+    <button type="button" class="btn btn-warning ms-2" id="restore-backup-button">
+        Przywróć dane
+    </button>
+    <button type="button" class="btn btn-danger ms-2" id="clear-table-button">
+        Wyczyść tabelę
+    </button>
+    <button type="button" class="btn btn-dark ms-2" id="finish-competition-button">
+        Zakończ zawody
+    </button>
+    <input type="file" id="restore-backup-input" accept=".json,application/json" style="display:none">
+</div>
+
+<div id="dev-tools" class="card border-secondary mb-4 d-none">
+    <div class="card-body d-flex flex-wrap align-items-center gap-2">
+        <strong class="text-secondary">Menu deweloperskie:</strong>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="populate-example-data-button">
+            Wypełnij przykładowymi danymi
+        </button>
     </div>
 </div>
 
@@ -181,6 +207,269 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+    const backupButton = document.getElementById("create-backup-button");
+    if (backupButton) {
+        backupButton.addEventListener("click", () => {
+            backupButton.disabled = true;
+            backupButton.classList.add("disabled");
+
+            fetch("/backup", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+                .then((response) => {
+                    if (!response.ok) {
+                        return response.json().catch(() => ({})).then((payload) => {
+                            const message = payload && payload.message ? payload.message : "Nie udało się utworzyć kopii zapasowej.";
+                            throw new Error(message);
+                        });
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    const backupInfo = payload && payload.backup ? `Kopia zapisana w ${payload.backup}` : "Kopia zapasowa została utworzona.";
+                    alert(backupInfo);
+                })
+                .catch((error) => {
+                    alert(error.message || "Nie udało się utworzyć kopii zapasowej.");
+                })
+                .finally(() => {
+                    backupButton.disabled = false;
+                    backupButton.classList.remove("disabled");
+                });
+        });
+    }
+
+    const finishButton = document.getElementById("finish-competition-button");
+    if (finishButton) {
+        finishButton.addEventListener("click", () => {
+            if (!confirm("Czy na pewno chcesz zakończyć zawody i pobrać archiwum?")) {
+                return;
+            }
+
+            finishButton.disabled = true;
+            finishButton.classList.add("disabled");
+
+            let redirected = false;
+            fetch("/finish")
+                .then((response) => {
+                    if (response.redirected) {
+                        redirected = true;
+                        window.location.href = response.url;
+                        return null;
+                    }
+
+                    if (!response.ok) {
+                        return response
+                            .text()
+                            .then((message) => {
+                                throw new Error(message || "Nie udało się zakończyć zawodów.");
+                            });
+                    }
+
+                    const disposition = response.headers.get("Content-Disposition") || "";
+                    return response.blob().then((blob) => ({ blob, disposition }));
+                })
+                .then((payload) => {
+                    if (!payload) {
+                        return;
+                    }
+
+                    const { blob, disposition } = payload;
+                    let filename = "zawody.zip";
+                    const match = /filename="?([^";]+)"?/i.exec(disposition);
+                    if (match && match[1]) {
+                        filename = match[1];
+                    }
+
+                    const url = window.URL.createObjectURL(blob);
+                    const anchor = document.createElement("a");
+                    anchor.href = url;
+                    anchor.download = filename;
+                    document.body.appendChild(anchor);
+                    anchor.click();
+                    anchor.remove();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch((error) => {
+                    if (error && error.message) {
+                        alert(error.message === "" ? "Nie udało się zakończyć zawodów." : error.message);
+                    } else {
+                        alert("Nie udało się zakończyć zawodów.");
+                    }
+                })
+                .finally(() => {
+                    if (!redirected) {
+                        finishButton.disabled = false;
+                        finishButton.classList.remove("disabled");
+                    }
+                });
+        });
+    }
+
+    const devToggle = document.getElementById("dev-menu-toggle");
+    const devTools = document.getElementById("dev-tools");
+    const populateButton = document.getElementById("populate-example-data-button");
+
+    const syncDevMenuState = () => {
+        if (!devTools) {
+            return;
+        }
+        const enabled = devToggle ? devToggle.checked : false;
+        devTools.classList.toggle("d-none", !enabled);
+        if (populateButton) {
+            populateButton.disabled = !enabled;
+            populateButton.classList.toggle("disabled", !enabled);
+        }
+    };
+
+    if (devToggle) {
+        devToggle.addEventListener("change", syncDevMenuState);
+    }
+    syncDevMenuState();
+
+    if (populateButton) {
+        populateButton.addEventListener("click", () => {
+            if (populateButton.disabled) {
+                return;
+            }
+            if (!confirm("Czy na pewno nadpisać tabelę przykładowymi danymi?")) {
+                return;
+            }
+
+            populateButton.disabled = true;
+            populateButton.classList.add("disabled");
+
+            fetch("/dev/populate", { method: "POST" })
+                .then((response) => {
+                    if (!response.ok) {
+                        return response.json().catch(() => ({})).then((data) => {
+                            const message =
+                                data && data.message
+                                    ? data.message
+                                    : "Nie udało się wypełnić tabeli przykładowymi danymi.";
+                            throw new Error(message);
+                        });
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    const message =
+                        (payload && payload.message) ||
+                        "Tabela została wypełniona przykładowymi danymi.";
+                    alert(message);
+                    window.location.reload();
+                })
+                .catch((error) => {
+                    alert(
+                        error && error.message
+                            ? error.message
+                            : "Nie udało się wypełnić tabeli przykładowymi danymi."
+                    );
+                })
+                .finally(() => {
+                    syncDevMenuState();
+                });
+        });
+    }
+
+    const restoreButton = document.getElementById("restore-backup-button");
+    const restoreInput = document.getElementById("restore-backup-input");
+    if (restoreButton && restoreInput) {
+        restoreButton.addEventListener("click", () => {
+            restoreInput.value = "";
+            restoreInput.click();
+        });
+
+        restoreInput.addEventListener("change", () => {
+            const fileList = restoreInput.files;
+            if (!fileList || !fileList.length) {
+                return;
+            }
+
+            const [file] = fileList;
+            if (!file) {
+                return;
+            }
+
+            restoreButton.disabled = true;
+            restoreButton.classList.add("disabled");
+
+            const formData = new FormData();
+            formData.append("backup", file);
+
+            fetch("/restore/upload", {
+                method: "POST",
+                body: formData,
+            })
+                .then((response) => {
+                    if (!response.ok) {
+                        return response.json().catch(() => ({})).then((data) => {
+                            const message =
+                                data && data.message
+                                    ? data.message
+                                    : "Nie udało się przywrócić danych z kopii zapasowej.";
+                            throw new Error(message);
+                        });
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    if (payload && payload.message) {
+                        alert(payload.message);
+                    } else {
+                        alert("Dane zostały przywrócone.");
+                    }
+                    window.location.reload();
+                })
+                .catch((error) => {
+                    alert(error && error.message ? error.message : "Nie udało się przywrócić danych z kopii zapasowej.");
+                })
+                .finally(() => {
+                    restoreButton.disabled = false;
+                    restoreButton.classList.remove("disabled");
+                    restoreInput.value = "";
+                });
+        });
+    }
+
+    const clearButton = document.getElementById("clear-table-button");
+    if (clearButton) {
+        clearButton.addEventListener("click", () => {
+            if (!confirm("Czy na pewno chcesz wyczyścić wszystkie wpisy w tabeli?")) {
+                return;
+            }
+
+            clearButton.disabled = true;
+            clearButton.classList.add("disabled");
+
+            fetch("/clear", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Request failed");
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    if (payload && payload.backup) {
+                        alert(`Utworzono kopię zapasową: ${payload.backup}`);
+                    }
+                    window.location.reload();
+                })
+                .catch(() => {
+                    clearButton.disabled = false;
+                    clearButton.classList.remove("disabled");
+                });
+        });
+    }
+
     const titleEl = document.getElementById("page-title");
     if (!titleEl) {
         return;

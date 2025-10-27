@@ -32,9 +32,42 @@
             </thead>
             <tbody>
                 {% for competitor in parcour.competitors %}
+                    {% set shot_counter = namespace(value=0) %}
+                    <tr class="shot-index-row">
+                        <td class="start-number" rowspan="2">{{ competitor.number }}</td>
+                        <td class="name-cell" rowspan="2">{{ competitor.name }}</td>
+                        {% for series in series_range %}
+                            {% set series_loop = loop %}
+                            {% for shot in shots_range %}
+                                {% set shot_loop = loop %}
+                                {% set is_start = shot_loop.index0 == 0 %}
+                                {% set is_end = shot_loop.last %}
+                                {% if is_start and is_end %}
+                                    {% set cell_class = 'series-group-start series-group-end' %}
+                                {% elif is_start %}
+                                    {% set cell_class = 'series-group-start' %}
+                                {% elif is_end %}
+                                    {% set cell_class = 'series-group-end' %}
+                                {% else %}
+                                    {% set cell_class = '' %}
+                                {% endif %}
+                                {% set series_index = series_loop.index0 %}
+                                {% set shot_index = shot_loop.index0 %}
+                                {% set marker_value = competitor.markers[series_index][shot_index] %}
+                                {% set marker_string = (marker_value if marker_value is not none else '') ~ '' %}
+                                {% set marker_clean = marker_string | trim | upper %}
+                                <td class="{{ cell_class }}">
+                                    {% if marker_clean != 'X' and shot_counter.value < 25 %}
+                                        {% set shot_counter.value = shot_counter.value + 1 %}
+                                        {{ shot_counter.value }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        {% endfor %}
+                        <td class="result-cell" rowspan="2"></td>
+                        <td class="signature-cell" rowspan="2"></td>
+                    </tr>
                     <tr>
-                        <td class="start-number">{{ competitor.number }}</td>
-                        <td class="name-cell">{{ competitor.name }}</td>
                         {% for series_markers in competitor.markers %}
                             {% for marker in series_markers %}
                             {% if loop.index0 == 0 %}
@@ -47,8 +80,6 @@
                             <td class="{{ cell_class }}">{{ marker }}</td>
                             {% endfor %}
                         {% endfor %}
-                        <td></td>
-                        <td></td>
                     </tr>
                 {% endfor %}
                 <tr>

@@ -51,6 +51,11 @@ body {
     height: 18px;
 }
 
+.metric-table th[rowspan],
+.metric-table td[rowspan] {
+    vertical-align: middle;
+}
+
 .metric-table th.start-number,
 .metric-table td.start-number {
     width: 55px;
@@ -83,4 +88,10 @@ body {
     height: 28px;
     text-align: left;
     padding-left: 10px;
+}
+
+.shot-index-row td:not([rowspan]) {
+    font-size: 8px;
+    font-weight: bold;
+    background-color: #f5f5f5;
 }

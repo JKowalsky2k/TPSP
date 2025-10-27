@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Konfiguracja zawodów</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='index.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center min-vh-100 p-4">
+    <div class="card shadow-lg w-100" style="max-width: 520px;">
+        <div class="card-header bg-primary text-white">
+            <h1 class="h4 mb-0">Witaj w konfiguracji zawodów</h1>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                Wygląda na to, że baza danych nie zawiera jeszcze zawodników. Podaj liczbę startujących,
+                a aplikacja utworzy dla nich puste miejsca w tabeli.
+            </p>
+
+            {% if error %}
+            <div class="alert alert-danger" role="alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post" class="d-flex flex-column gap-3">
+                <div>
+                    <label for="competition-name" class="form-label fw-semibold">Nazwa zawodów</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="competition-name"
+                        name="competition_name"
+                        maxlength="120"
+                        value="{{ competition_name_value }}"
+                        placeholder="{{ default_page_title }}"
+                    >
+                    <div class="form-text">
+                        Ta nazwa pojawi się w nagłówku głównej tabeli.
+                    </div>
+                </div>
+                <div>
+                    <label for="competitor-count" class="form-label fw-semibold">Liczba zawodników</label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="competitor-count"
+                        name="competitor_count"
+                        min="1"
+                        max="2000"
+                        required
+                        value="{{ competitor_count_value }}"
+                    >
+                    <div class="form-text">
+                        Domyślna wartość: {{ default_competitor_count }} zawodników.
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        Utwórz listę zawodników
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
