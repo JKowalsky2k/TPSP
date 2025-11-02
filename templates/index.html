@@ -34,9 +34,6 @@
     <button type="button" class="btn btn-danger ms-2" id="clear-table-button">
         Wyczyść tabelę
     </button>
-    <button type="button" class="btn btn-dark ms-2" id="finish-competition-button">
-        Zakończ zawody
-    </button>
     <input type="file" id="restore-backup-input" accept=".json,application/json" style="display:none">
 </div>
 
@@ -238,73 +235,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 .finally(() => {
                     backupButton.disabled = false;
                     backupButton.classList.remove("disabled");
-                });
-        });
-    }
-
-    const finishButton = document.getElementById("finish-competition-button");
-    if (finishButton) {
-        finishButton.addEventListener("click", () => {
-            if (!confirm("Czy na pewno chcesz zakończyć zawody i pobrać archiwum?")) {
-                return;
-            }
-
-            finishButton.disabled = true;
-            finishButton.classList.add("disabled");
-
-            let redirected = false;
-            fetch("/finish")
-                .then((response) => {
-                    if (response.redirected) {
-                        redirected = true;
-                        window.location.href = response.url;
-                        return null;
-                    }
-
-                    if (!response.ok) {
-                        return response
-                            .text()
-                            .then((message) => {
-                                throw new Error(message || "Nie udało się zakończyć zawodów.");
-                            });
-                    }
-
-                    const disposition = response.headers.get("Content-Disposition") || "";
-                    return response.blob().then((blob) => ({ blob, disposition }));
-                })
-                .then((payload) => {
-                    if (!payload) {
-                        return;
-                    }
-
-                    const { blob, disposition } = payload;
-                    let filename = "zawody.zip";
-                    const match = /filename="?([^";]+)"?/i.exec(disposition);
-                    if (match && match[1]) {
-                        filename = match[1];
-                    }
-
-                    const url = window.URL.createObjectURL(blob);
-                    const anchor = document.createElement("a");
-                    anchor.href = url;
-                    anchor.download = filename;
-                    document.body.appendChild(anchor);
-                    anchor.click();
-                    anchor.remove();
-                    window.URL.revokeObjectURL(url);
-                })
-                .catch((error) => {
-                    if (error && error.message) {
-                        alert(error.message === "" ? "Nie udało się zakończyć zawodów." : error.message);
-                    } else {
-                        alert("Nie udało się zakończyć zawodów.");
-                    }
-                })
-                .finally(() => {
-                    if (!redirected) {
-                        finishButton.disabled = false;
-                        finishButton.classList.remove("disabled");
-                    }
                 });
         });
     }
