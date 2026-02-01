@@ -523,6 +523,35 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
 
+        const selectCellContents = (cell) => {
+            if (!cell || !cell.hasAttribute("contenteditable")) {
+                return;
+            }
+            const selection = window.getSelection && window.getSelection();
+            if (!selection) {
+                return;
+            }
+            const range = document.createRange();
+            range.selectNodeContents(cell);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
+
+        const scheduleCellSelection = (cell) => {
+            if (!cell || !cell.hasAttribute("contenteditable")) {
+                return;
+            }
+            const schedule =
+                (window.requestAnimationFrame && window.requestAnimationFrame.bind(window)) ||
+                ((callback) => window.setTimeout(callback, 0));
+            schedule(() => {
+                if (document.activeElement !== cell) {
+                    return;
+                }
+                selectCellContents(cell);
+            });
+        };
+
         const focusCell = (cell) => {
             if (!cell) {
                 return;
@@ -546,14 +575,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
             if (cell.hasAttribute("contenteditable")) {
-                const selection = window.getSelection && window.getSelection();
-                if (!selection) {
-                    return;
-                }
-                const range = document.createRange();
-                range.selectNodeContents(cell);
-                selection.removeAllRanges();
-                selection.addRange(range);
+                scheduleCellSelection(cell);
             }
         };
 
@@ -608,14 +630,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             cell.dataset.overwriteOnType = "true";
-            const selection = window.getSelection && window.getSelection();
-            if (!selection) {
-                return;
-            }
-            const range = document.createRange();
-            range.selectNodeContents(cell);
-            selection.removeAllRanges();
-            selection.addRange(range);
+            scheduleCellSelection(cell);
         });
 
         resultsTable.addEventListener("focusout", (event) => {

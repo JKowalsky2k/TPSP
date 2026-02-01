@@ -884,7 +884,7 @@ def combine_backup_summaries(payloads: list[dict[str, object]], max_editions: in
 
     sorted_payloads = sorted(payloads[:max_editions], key=_backup_sort_key)
 
-    combined: dict[tuple[str, str, str], dict[str, object]] = {}
+    combined: dict[tuple[str, str], dict[str, object]] = {}
     for idx in range(edition_count):
         if idx >= len(sorted_payloads):
             continue
@@ -898,7 +898,6 @@ def combine_backup_summaries(payloads: list[dict[str, object]], max_editions: in
             key = (
                 normalized["lastname"].lower(),
                 normalized["name"].lower(),
-                normalized["category"].lower(),
             )
             entry = combined.setdefault(
                 key,
@@ -911,6 +910,7 @@ def combine_backup_summaries(payloads: list[dict[str, object]], max_editions: in
                 },
             )
             entry["editions"][idx] = normalized["result"]
+            entry["category"] = normalized["category"]
             if not entry.get("squad"):
                 entry["squad"] = normalized["squad"]
 
