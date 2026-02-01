@@ -736,6 +736,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 focusCell(targetCell);
             }
         });
+
+        resultsTable.addEventListener("keyup", (event) => {
+            if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+                return;
+            }
+            if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) {
+                return;
+            }
+            const active = document.activeElement;
+            if (!active || typeof active.closest !== "function") {
+                return;
+            }
+            const cell = active.closest("td[data-grid-cell]");
+            if (cell && cell.hasAttribute("contenteditable")) {
+                cell.dataset.overwriteOnType = "true";
+                scheduleCellSelection(cell);
+            }
+        });
     }
 
     const restoreButton = document.getElementById("restore-backup-button");
