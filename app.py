@@ -78,10 +78,10 @@ DEFAULT_COLUMNS: list[dict[str, object]] = [
     {"name": "name", "label": "Imię", "editable": True},
     {"name": "lastname", "label": "Nazwisko", "editable": True},
     {"name": "category", "label": "Klasa", "editable": True},
-    {"name": "parcour1", "label": "Parkur 1", "editable": True},
-    {"name": "parcour2", "label": "Parkur 2", "editable": True},
-    {"name": "parcour3", "label": "Parkur 3", "editable": True},
-    {"name": "parcour4", "label": "Parkur 4", "editable": True},
+    {"name": "parcour1", "label": "Oś 1", "editable": True},
+    {"name": "parcour2", "label": "Oś 2", "editable": True},
+    {"name": "parcour3", "label": "Oś 3", "editable": True},
+    {"name": "parcour4", "label": "Oś 4", "editable": True},
     {"name": "result", "label": "Wynik", "editable": False},
 ]
 DEFAULT_SETTINGS = {
@@ -157,7 +157,7 @@ def _normalize_schedule_headers(headers: Sequence[str] | None, stand_count: int)
     for idx in range(stand_count):
         label = header_values[idx] if idx < len(header_values) else ""
         cleaned = str(label or "").strip()
-        normalized.append(cleaned or f"Parkur {idx + 1}")
+        normalized.append(cleaned or f"Oś {idx + 1}")
     return normalized
 
 
