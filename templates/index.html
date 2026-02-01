@@ -728,16 +728,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (cell.hasAttribute("contenteditable")) {
-                const selection = window.getSelection && window.getSelection();
-                if (selection && selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    if (
-                        cell.contains(range.startContainer) &&
-                        cell.contains(range.endContainer) &&
-                        !isWholeCellSelection(cell)
-                    ) {
-                        return;
-                    }
+                const isNavMode = cell.dataset.overwriteOnType === "true";
+                if (!isNavMode && !isWholeCellSelection(cell)) {
+                    return;
                 }
             }
 
