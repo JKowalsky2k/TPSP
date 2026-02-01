@@ -552,6 +552,30 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         };
 
+        let activeCell = null;
+
+        const setActiveCell = (cell) => {
+            if (!cell) {
+                return;
+            }
+            if (activeCell && activeCell !== cell) {
+                activeCell.classList.remove("active-cell");
+            }
+            activeCell = cell;
+            activeCell.classList.add("active-cell");
+        };
+
+        const clearActiveCell = (cell) => {
+            if (!activeCell) {
+                return;
+            }
+            if (cell && activeCell !== cell) {
+                return;
+            }
+            activeCell.classList.remove("active-cell");
+            activeCell = null;
+        };
+
         const focusCell = (cell) => {
             if (!cell) {
                 return;
@@ -588,6 +612,26 @@ document.addEventListener("DOMContentLoaded", () => {
             return { rowIndex, colIndex };
         };
 
+        const isWholeCellSelection = (cell) => {
+            if (!cell || !cell.hasAttribute("contenteditable")) {
+                return false;
+            }
+            const selection = window.getSelection && window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                return false;
+            }
+            const range = selection.getRangeAt(0);
+            if (!cell.contains(range.startContainer) || !cell.contains(range.endContainer)) {
+                return false;
+            }
+            const fullRange = document.createRange();
+            fullRange.selectNodeContents(cell);
+            return (
+                range.compareBoundaryPoints(Range.START_TO_START, fullRange) === 0 &&
+                range.compareBoundaryPoints(Range.END_TO_END, fullRange) === 0
+            );
+        };
+
         const pickTargetCell = (rowIndex, colIndex) => {
             if (rowIndex < 0 || colIndex < 0) {
                 return null;
@@ -616,6 +660,11 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsTable.addEventListener("focusin", (event) => {
             const cell = event.target.closest("td[data-grid-cell]");
             const row = cell ? cell.parentElement : null;
+            if (cell) {
+                setActiveCell(cell);
+            } else {
+                clearActiveCell();
+            }
             scrollRowIntoView(row);
             if (cell && cell.hasAttribute("contenteditable")) {
                 cell.dataset.initialValue = cell.textContent;
@@ -638,6 +687,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!cell) {
                 return;
             }
+            clearActiveCell(cell);
             delete cell.dataset.pointerSelecting;
             delete cell.dataset.overwriteOnType;
         });
@@ -675,6 +725,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (event.target.tagName === "SELECT" && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
                 return;
+            }
+
+            if (cell.hasAttribute("contenteditable")) {
+                const selection = window.getSelection && window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    if (
+                        cell.contains(range.startContainer) &&
+                        cell.contains(range.endContainer) &&
+                        !isWholeCellSelection(cell)
+                    ) {
+                        return;
+                    }
+                }
             }
 
             event.preventDefault();

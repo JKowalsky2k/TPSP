@@ -80,9 +80,11 @@ th.cursor-pointer {
     color: #fff;
 }
 
-/* Podświetlenie komórki w trakcie edycji */
-td[contenteditable]:focus {
-    outline: 2px solid #fd5a5a; /* żółta obwódka */
+/* Podświetlenie aktywnej komórki (nawigacja jak w Excelu) */
+td[contenteditable]:focus,
+td[data-grid-cell].active-cell {
+    outline: 2px solid #fd5a5a;
+    outline-offset: -2px;
 }
 
 .row-editing td,
