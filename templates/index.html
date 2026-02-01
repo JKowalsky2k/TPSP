@@ -552,6 +552,26 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         };
 
+        const isWholeCellSelection = (cell) => {
+            if (!cell || !cell.hasAttribute("contenteditable")) {
+                return false;
+            }
+            const selection = window.getSelection && window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                return false;
+            }
+            const range = selection.getRangeAt(0);
+            if (!cell.contains(range.startContainer) || !cell.contains(range.endContainer)) {
+                return false;
+            }
+            const fullRange = document.createRange();
+            fullRange.selectNodeContents(cell);
+            return (
+                range.compareBoundaryPoints(Range.START_TO_START, fullRange) === 0 &&
+                range.compareBoundaryPoints(Range.END_TO_END, fullRange) === 0
+            );
+        };
+
         let activeCell = null;
 
         const setActiveCell = (cell) => {
@@ -735,6 +755,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 scrollRowIntoView(targetCell.parentElement);
                 focusCell(targetCell);
             }
+        });
+
+        document.addEventListener("selectionchange", () => {
+            const active = document.activeElement;
+            if (!active || typeof active.closest !== "function") {
+                return;
+            }
+            const cell = active.closest("td[data-grid-cell][contenteditable]");
+            if (!cell) {
+                return;
+            }
+            if (cell.dataset.overwriteOnType !== "true") {
+                return;
+            }
+            if (isWholeCellSelection(cell)) {
+                return;
+            }
+            scheduleCellSelection(cell);
         });
 
         resultsTable.addEventListener("keyup", (event) => {
