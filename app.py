@@ -952,6 +952,9 @@ def combine_backup_summaries(
     rows = []
     for entry in combined.values():
         editions = entry["editions"]
+        first_three = [int(value or 0) for value in editions[:3]]
+        top_two = sorted(first_three, reverse=True)[:2]
+        total_2ef = sum(top_two) + (int(editions[3]) if len(editions) > 3 else 0)
         rows.append(
             {
                 "name": entry["name"],
@@ -960,6 +963,7 @@ def combine_backup_summaries(
                 "squad": entry.get("squad", 0),
                 "editions": editions,
                 "total": sum(editions),
+                "total_2ef": total_2ef,
             }
         )
 
@@ -967,7 +971,11 @@ def combine_backup_summaries(
     return rows
 
 
-def build_summary_pdf_bytes(rows: list[dict[str, object]], edition_labels: list[str]) -> bytes:
+def build_summary_pdf_bytes(
+    rows: list[dict[str, object]],
+    edition_labels: list[str],
+    total_label: str = "Suma",
+) -> bytes:
     _ensure_pdf_backend()
     styles = _get_pdf_styles()
     buffer = BytesIO()
@@ -981,7 +989,8 @@ def build_summary_pdf_bytes(rows: list[dict[str, object]], edition_labels: list[
         bottomMargin=20,
     )
 
-    header_cells = ["Imię", "Nazwisko", "Klasa"] + list(edition_labels) + ["Suma"]
+    safe_total_label = str(total_label or "Suma").strip() or "Suma"
+    header_cells = ["Imię", "Nazwisko", "Klasa"] + list(edition_labels) + [safe_total_label]
     table_data: list[list[Paragraph | str]] = [header_cells]
 
     for row in rows:
@@ -1931,6 +1940,7 @@ def summary_pdf():
     payload = request.get_json(silent=True) or {}
     rows = payload.get("rows")
     edition_labels = payload.get("edition_labels")
+    total_label = payload.get("total_label")
 
     if not isinstance(rows, list) or not isinstance(edition_labels, list):
         return jsonify({"error": "Brak danych do wygenerowania PDF."}), 400
@@ -1939,7 +1949,11 @@ def summary_pdf():
     if not edition_labels:
         edition_labels = [f"Edycja {idx}" for idx in range(1, SUMMARY_EDITION_LIMIT + 1)]
     try:
-        pdf_bytes = build_summary_pdf_bytes(rows, edition_labels)
+        pdf_bytes = build_summary_pdf_bytes(
+            rows,
+            edition_labels,
+            total_label=str(total_label or "Suma"),
+        )
     except Exception as exc:  # pragma: no cover - defensive
         return jsonify({"error": f"Nie udało się wygenerować PDF: {exc}"}), 500
 

@@ -45,19 +45,28 @@
         <button type="button" class="btn btn-outline-orange" id="summary-sort-category">
             Sortuj: kategorie A→Z, wynik malejąco
         </button>
+        <button type="button" class="btn btn-outline-orange" id="summary-sort-default">
+            Sortowanie domyślne
+        </button>
         <button type="button" class="btn btn-outline-purple" id="summary-pdf-button">
             Eksportuj PDF (obecny widok)
         </button>
+        <div class="form-check form-switch ms-2 summary-switch-box summary-switch-blue">
+            <input class="form-check-input switch-blue" type="checkbox" id="summary-show-2ef-only">
+            <label class="form-check-label" for="summary-show-2ef-only">
+                Pokaż tylko 2E + F
+            </label>
+        </div>
     </div>
     <div class="d-flex flex-column align-items-end gap-1 ms-auto">
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="summary-show-empty-category">
+        <div class="form-check form-switch summary-switch-box summary-switch-orange">
+            <input class="form-check-input switch-orange" type="checkbox" id="summary-show-empty-category">
             <label class="form-check-label" for="summary-show-empty-category">
                 Pokaż zawodników bez kategorii
             </label>
         </div>
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="summary-show-zero-total">
+        <div class="form-check form-switch summary-switch-box summary-switch-orange">
+            <input class="form-check-input switch-orange" type="checkbox" id="summary-show-zero-total">
             <label class="form-check-label" for="summary-show-zero-total">
                 Pokaż zawodników z wynikiem 0
             </label>
@@ -74,7 +83,10 @@
                 {% for label in edition_labels %}
                 <th class="cursor-pointer" data-sort-key="edition-{{ loop.index0 }}">{{ label }} <span class="sort-indicator" aria-hidden="true"></span></th>
                 {% endfor %}
-                <th class="cursor-pointer" data-sort-key="total">Suma <span class="sort-indicator" aria-hidden="true"></span></th>
+                <th class="cursor-pointer" data-sort-key="total">
+                    <span id="summary-total-label">Suma</span>
+                    <span class="sort-indicator" aria-hidden="true"></span>
+                </th>
             </tr>
         </thead>
         <tbody>
@@ -86,6 +98,8 @@
                 data-category="{{ row.category }}"
                 data-squad="{{ row.squad }}"
                 data-total="{{ row.total }}"
+                data-total-default="{{ row.total }}"
+                data-total-2ef="{{ row.total_2ef }}"
                 {% for idx in range(edition_labels|length) %}
                 data-ed{{ idx }}="{{ row.editions[idx] if row.editions and idx < row.editions|length else 0 }}"
                 {% endfor %}
@@ -111,9 +125,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const headers = Array.from(document.querySelectorAll("th[data-sort-key]"));
     const rows = Array.from(document.querySelectorAll("tr[data-summary-row]"));
     const sortCategoryBtn = document.getElementById("summary-sort-category");
+    const sortDefaultBtn = document.getElementById("summary-sort-default");
     const showEmptyCategoryToggle = document.getElementById("summary-show-empty-category");
     const showZeroTotalToggle = document.getElementById("summary-show-zero-total");
+    const show2efOnlyToggle = document.getElementById("summary-show-2ef-only");
     const pdfButton = document.getElementById("summary-pdf-button");
+    const totalLabel = document.getElementById("summary-total-label");
     const collator = new Intl.Collator("pl", { sensitivity: "base" });
 
     const getValue = (row, key) => {
@@ -196,15 +213,85 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    const getEditionValue = (row, idx) => {
+        return parseInt(row.dataset[`ed${idx}`] || "0", 10) || 0;
+    };
+
+    const updateTotalLabel = () => {
+        if (!totalLabel) return;
+        const show2efOnly = Boolean(show2efOnlyToggle?.checked);
+        totalLabel.textContent = show2efOnly ? "Suma (2E+F)" : "Suma";
+    };
+
+    const getTopTwoFromFirstThree = (values) => {
+        const ranked = values
+            .map((value, idx) => ({ value, idx }))
+            .sort((a, b) => b.value - a.value);
+        return ranked.slice(0, 2);
+    };
+
+    const compute2ef = (row) => {
+        const firstThree = [0, 1, 2].map((idx) => getEditionValue(row, idx));
+        const positiveCount = firstThree.filter((value) => value > 0).length;
+        const topTwo = getTopTwoFromFirstThree(firstThree);
+        const topTwoSum = topTwo.reduce((sum, item) => sum + item.value, 0);
+        const finalValue = getEditionValue(row, 3);
+        const total = topTwoSum + (finalValue > 0 ? finalValue : 0);
+        return {
+            qualifies: positiveCount >= 2 && finalValue > 0,
+            total,
+            topTwoIdx: topTwo.map((item) => item.idx),
+            finalUsed: finalValue > 0,
+        };
+    };
+
+    const setRowTotal = (row, value) => {
+        row.dataset.total = String(value);
+        const totalCell = row.children[3 + editionCount];
+        if (totalCell) {
+            totalCell.textContent = String(value);
+        }
+    };
+
+    const clearHighlights = (row) => {
+        for (let i = 0; i < editionCount; i += 1) {
+            const cell = row.children[3 + i];
+            if (cell) cell.classList.remove("summary-highlight");
+        }
+    };
+
+    const applyHighlights = (row, topTwoIdx, finalUsed) => {
+        topTwoIdx.forEach((idx) => {
+            const cell = row.children[3 + idx];
+            if (cell) cell.classList.add("summary-highlight");
+        });
+        if (finalUsed) {
+            const finalCell = row.children[3 + 3];
+            if (finalCell) finalCell.classList.add("summary-highlight");
+        }
+    };
+
     const applyFilters = () => {
         const showEmpty = Boolean(showEmptyCategoryToggle?.checked);
         const showZero = Boolean(showZeroTotalToggle?.checked);
+        const show2efOnly = Boolean(show2efOnlyToggle?.checked);
+        updateTotalLabel();
         rows.forEach((row) => {
             const category = (row.dataset.category || "").trim();
-            const total = parseInt(row.dataset.total || "0", 10) || 0;
+            clearHighlights(row);
+            const defaultTotal = parseInt(row.dataset.totalDefault || "0", 10) || 0;
+            let total = defaultTotal;
             const categoryOk = category || showEmpty;
+            let qualifiesOk = true;
+            if (show2efOnly) {
+                const computed = compute2ef(row);
+                qualifiesOk = computed.qualifies;
+                total = computed.total;
+                applyHighlights(row, computed.topTwoIdx, computed.finalUsed);
+            }
+            setRowTotal(row, total);
             const totalOk = total !== 0 || showZero;
-            if (categoryOk && totalOk) {
+            if (categoryOk && totalOk && qualifiesOk) {
                 row.style.display = "";
             } else {
                 row.style.display = "none";
@@ -214,6 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     showEmptyCategoryToggle?.addEventListener("change", applyFilters);
     showZeroTotalToggle?.addEventListener("change", applyFilters);
+    show2efOnlyToggle?.addEventListener("change", applyFilters);
     applyFilters();
 
     const buildPdfRows = () => {
@@ -258,11 +346,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    sortDefaultBtn?.addEventListener("click", () => {
+        sortKey = "lastname";
+        sortDir = "asc";
+        applySort();
+    });
+
     pdfButton?.addEventListener("click", () => {
         applySort();
         const payload = {
             rows: buildPdfRows(),
             edition_labels: {{ edition_labels|tojson }},
+            total_label: (totalLabel?.textContent || "Suma").trim(),
         };
         pdfButton.disabled = true;
         fetch("{{ url_for('summary_pdf') }}", {
